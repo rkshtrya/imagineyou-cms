@@ -84,7 +84,7 @@ export default function StoriesPage() {
         <p className="text-gray-600 dark:text-gray-400 mb-8 text-center">{story.description}</p>
 
         {slides.length > 0 ? (
-          <StorySlider slides={slides} />
+          <StorySlider slides={slides} title={story.title} />
         ) : (
           <p className="text-gray-500 text-center">No slides available for this story yet.</p>
         )}
