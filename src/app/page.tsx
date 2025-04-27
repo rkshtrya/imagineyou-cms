@@ -1,103 +1,95 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import FilterMenu from '@/components/FilterMenu';
+import Link from 'next/link';
+
+export default function Page() {
+  const [category, setCategory] = useState<string>('All');
+  const [theme, setTheme] = useState<string>('All');
+  const [stories, setStories] = useState<any[]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const handleFilterChange = async (type: 'category' | 'theme', value: string) => {
+    if (type === 'category') setCategory(value);
+    if (type === 'theme') setTheme(value);
+
+    let query = supabase.from('stories').select('*');
+
+    if (value !== 'All') {
+      query = type === 'category'
+        ? query.eq('category', value)
+        : query.eq('theme', value);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (!error) setStories(data || []);
+    else console.error('Error:', error.message);
+  };
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from('stories')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error) setStories(data || []);
+      else console.error('Error loading initial stories:', error.message);
+    })();
+  }, []);
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="min-h-screen p-4 sm:p-8 bg-gray-50 dark:bg-gray-900">
+      {/* Header: Hamburger + Title */}
+      <div className="flex items-center justify-start mb-6 space-x-4">
+        <button
+          onClick={() => setFilterOpen(!filterOpen)}
+          className="text-2xl font-bold text-gray-700 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-800 p-2 rounded"
+        >
+          ☰
+        </button>
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">
+          Kids Story App 📚
+        </h1>
+      </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      {/* Show FilterMenu on hamburger click */}
+      {filterOpen && (
+        <div className="absolute z-50 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 mt-2">
+          <FilterMenu onFilterChange={handleFilterChange} />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      )}
+
+      {/* Stories Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+        {stories.length > 0 ? (
+          stories.map((story) => (
+            <Link key={story.id} href={`/stories/${story.slug}`}>
+              <div className="cursor-pointer bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow hover:shadow-lg transition flex flex-col">
+                {story.cover_image_url && (
+                  <img
+                    src={story.cover_image_url}
+                    alt={story.title}
+                    className="w-full h-48 object-cover rounded mb-4"
+                  />
+                )}
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2 text-center">
+                  {story.title}
+                </h2>
+                {story.description && (
+                  <p className="text-sm text-gray-600 dark:text-gray-300 text-center">
+                    {story.description}
+                  </p>
+                )}
+              </div>
+            </Link>
+          ))
+        ) : (
+          <p className="text-center text-gray-600 dark:text-gray-400 col-span-full">No stories available.</p>
+        )}
+      </div>
+    </main>
   );
 }
