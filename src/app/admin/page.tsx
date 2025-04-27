@@ -1,5 +1,3 @@
-// /src/app/admin/page.tsx (final full working version)
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -17,6 +15,8 @@ export default function AdminPage() {
     slides: [] as { image: File | null; audio: File | null }[],
   });
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+
+  const YOUR_DOMAIN = 'https://imagineyou.xyz';
 
   useEffect(() => {
     loadStories();
@@ -37,8 +37,8 @@ export default function AdminPage() {
     setForm(prev => ({ ...prev, slides: [...prev.slides, { image: null, audio: null }] }));
   }
 
-  function handleFileChange(e: any, type: 'cover') {
-    if (type === 'cover') setForm(prev => ({ ...prev, coverFile: e.target.files[0] }));
+  function handleFileChange(e: any) {
+    setForm(prev => ({ ...prev, coverFile: e.target.files[0] }));
   }
 
   function resetForm() {
@@ -58,12 +58,7 @@ export default function AdminPage() {
 
   async function handleEditStory(story: any) {
     setEditingStory(story);
-    setForm({
-      title: story.title,
-      description: story.description,
-      coverFile: null,
-      slides: [], // fresh, you can load slides if needed later
-    });
+    setForm({ title: story.title, description: story.description, coverFile: null, slides: [] });
   }
 
   async function handleSubmit() {
@@ -150,76 +145,84 @@ export default function AdminPage() {
   }
 
   return (
-      <main className="min-h-screen p-6 bg-gray-100 dark:bg-gray-900">
-        <div className="flex justify-end mb-6">
-          <Link href="/admin/dashboard"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
-            📊 Go to Dashboard
-          </Link>
-        </div>
-        <h1 className="text-3xl font-bold mb-6 text-center">Admin - Story Manager</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* List existing stories */}
-          <div>
-            <h2 className="text-2xl font-semibold mb-4">Existing Stories</h2>
-            {stories.map((story) => (
-                <div key={story.id}
-                     className="bg-white dark:bg-gray-800 p-4 rounded shadow mb-4 flex justify-between items-center">
-                  <div>
-                    <p className="font-bold text-lg">{story.title}</p>
-                    <p className="text-gray-500 text-sm">{story.slug}</p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button onClick={() => handleEditStory(story)}
-                            className="px-3 py-1 bg-blue-500 text-white rounded">Edit
-                    </button>
-                    <button onClick={() => handleDeleteStory(story.id)}
-                            className="px-3 py-1 bg-red-500 text-white rounded">Delete
-                    </button>
-                  </div>
-                </div>
-            ))}
-          </div>
+    <main className="min-h-screen p-6 bg-gray-100 dark:bg-gray-900">
+      <div className="flex justify-end mb-6">
+        <Link href="/admin/dashboard" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+          📊 Go to Dashboard
+        </Link>
+      </div>
 
-          {/* Create/Edit Form */}
-          <div>
-            <h2 className="text-2xl font-semibold mb-4">{editingStory ? 'Edit Story' : 'Create New Story'}</h2>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded shadow">
-              <input type="text" placeholder="Title" value={form.title}
-                     onChange={e => setForm(prev => ({...prev, title: e.target.value}))}
-                     className="w-full p-2 mb-4 border rounded"/>
-              <textarea placeholder="Description" value={form.description}
-                        onChange={e => setForm(prev => ({...prev, description: e.target.value}))}
-                        className="w-full p-2 mb-4 border rounded"></textarea>
-              <label className="block mb-2 font-semibold">Cover Image</label>
-              <input type="file" onChange={(e) => handleFileChange(e, 'cover')} className="mb-4"/>
+      <h1 className="text-3xl font-bold mb-6 text-center">Admin - Story Manager</h1>
 
-              <h3 className="text-lg font-bold mt-6 mb-2">Slides</h3>
-              {form.slides.map((slide, index) => (
-                  <div key={index} className="border p-4 rounded mb-4">
-                    <label className="block mb-1 font-semibold">Slide Image:</label>
-                    <input type="file" accept="image/*"
-                           onChange={(e) => handleSlideChange(index, 'image', e.target.files?.[0] || null)}/>
-                    <label className="block mt-2 mb-1 font-semibold">Slide Audio (optional):</label>
-                    <input type="file" accept="audio/*"
-                           onChange={(e) => handleSlideChange(index, 'audio', e.target.files?.[0] || null)}/>
-                  </div>
-              ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Existing Stories */}
+        <div>
+          <h2 className="text-2xl font-semibold mb-4">Existing Stories</h2>
+          {stories.map((story) => (
+            <div key={story.id} className="bg-white dark:bg-gray-800 p-4 rounded shadow mb-4">
+              <div className="mb-2">
+                <p className="font-bold text-lg">{story.title}</p>
+                <p className="text-gray-500 text-sm">{story.slug}</p>
+              </div>
 
-              <button onClick={handleAddSlide} className="w-full bg-blue-500 text-white py-2 rounded mb-4">➕ Add Another
-                Slide
-              </button>
+              {/* 🔥 Correct Link */}
+              <div className="mb-2">
+                <Link
+                  href={`/stories?slug=${story.slug}`}
+                  target="_blank"
+                  className="text-blue-600 dark:text-blue-400 text-sm break-all hover:underline"
+                >
+                  {`${YOUR_DOMAIN}/stories?slug=${story.slug}`}
+                </Link>
+              </div>
 
-              {uploadProgress > 0 && <div className="w-full bg-gray-200 rounded-full h-4 mb-4">
-                <div className="bg-blue-600 h-4 rounded-full" style={{width: `${uploadProgress}%`}}></div>
-              </div>}
-
-              <button onClick={handleSubmit} className="w-full bg-green-500 text-white py-2 rounded">
-                {editingStory ? 'Update Story' : 'Create Story'}
-              </button>
+              <div className="flex space-x-2 mt-2">
+                <button onClick={() => handleEditStory(story)} className="px-3 py-1 bg-blue-500 text-white rounded">Edit</button>
+                <button onClick={() => handleDeleteStory(story.id)} className="px-3 py-1 bg-red-500 text-white rounded">Delete</button>
+              </div>
             </div>
+          ))}
+        </div>
+
+        {/* Create/Edit Form */}
+        <div>
+          <h2 className="text-2xl font-semibold mb-4">{editingStory ? 'Edit Story' : 'Create New Story'}</h2>
+          <div className="bg-white dark:bg-gray-800 p-6 rounded shadow space-y-4">
+            <input type="text" placeholder="Title" value={form.title}
+              onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
+              className="w-full p-2 border rounded" />
+
+            <textarea placeholder="Description" value={form.description}
+              onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
+              className="w-full p-2 border rounded" />
+
+            <label className="block font-semibold">Cover Image</label>
+            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e)} />
+
+            <h3 className="text-lg font-bold mt-6">Slides</h3>
+            {form.slides.map((slide, index) => (
+              <div key={index} className="border p-4 rounded space-y-2">
+                <label>Slide Image:</label>
+                <input type="file" accept="image/*" onChange={(e) => handleSlideChange(index, 'image', e.target.files?.[0] || null)} />
+                <label>Slide Audio (optional):</label>
+                <input type="file" accept="audio/*" onChange={(e) => handleSlideChange(index, 'audio', e.target.files?.[0] || null)} />
+              </div>
+            ))}
+
+            <button onClick={handleAddSlide} className="w-full bg-blue-500 text-white py-2 rounded">➕ Add Another Slide</button>
+
+            {uploadProgress > 0 && (
+              <div className="w-full bg-gray-200 rounded-full h-4">
+                <div className="bg-blue-600 h-4 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+              </div>
+            )}
+
+            <button onClick={handleSubmit} className="w-full bg-green-500 text-white py-2 rounded">
+              {editingStory ? 'Update Story' : 'Create Story'}
+            </button>
           </div>
         </div>
-      </main>
+      </div>
+    </main>
   );
 }
