@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -13,6 +13,7 @@ export default function AdminPage() {
     title: '',
     description: '',
     coverFile: null as File | null,
+    coverAudio: null as File | null,
     slides: [] as { image: File | null; audio: File | null; description: string }[],
   });
   const [uploadProgress, setUploadProgress] = useState<number>(0);
@@ -21,6 +22,8 @@ export default function AdminPage() {
 
   const YOUR_DOMAIN = 'https://imagineyou.xyz';
   const SUPABASE_MEDIA_URL = 'https://rtixmkzobgswzuqewcvk.supabase.co/storage/v1/object/public/media';
+
+  const coverAudioRef = useRef<HTMLAudioElement | null>(null); // Ref for cover audio
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -75,12 +78,12 @@ export default function AdminPage() {
     setForm(prev => ({ ...prev, slides: [...prev.slides, { image: null, audio: null, description: '' }] }));
   }
 
-  function handleFileChange(e: any) {
-    setForm(prev => ({ ...prev, coverFile: e.target.files[0] }));
+  function handleFileChange(e: any, field: 'coverFile' | 'coverAudio') {
+    setForm(prev => ({ ...prev, [field]: e.target.files[0] }));
   }
 
   function resetForm() {
-    setForm({ title: '', description: '', coverFile: null, slides: [] });
+    setForm({ title: '', description: '', coverFile: null, coverAudio: null, slides: [] });
     setEditingStory(null);
     setUploadProgress(0);
   }
@@ -96,7 +99,7 @@ export default function AdminPage() {
 
   async function handleEditStory(story: any) {
     setEditingStory(story);
-    setForm({ title: story.title, description: story.description, coverFile: null, slides: [] });
+    setForm({ title: story.title, description: story.description, coverFile: null, coverAudio: null, slides: [] });
   }
 
   async function handleSubmit() {
@@ -108,6 +111,7 @@ export default function AdminPage() {
     const slug = form.title.toLowerCase().replace(/\s+/g, '-');
 
     let coverUrl = editingStory?.cover_image_url || '';
+    let coverAudioUrl = editingStory?.cover_audio_url || '';
 
     // Upload cover image if provided
     if (form.coverFile) {
@@ -128,13 +132,32 @@ export default function AdminPage() {
       }
     }
 
+    // Upload cover audio if provided
+    if (form.coverAudio) {
+      const { data, error } = await supabase.storage.from('media/audio').upload(`${uuidv4()}`, form.coverAudio);
+      if (error) {
+        console.error('Cover Audio Upload Error:', error.message);
+        alert('Error uploading cover audio.');
+        return;
+      }
+
+      // Construct the public URL for the uploaded audio
+      if (data?.path) {
+        coverAudioUrl = `${SUPABASE_MEDIA_URL}/audio/${data.path}`;
+      } else {
+        console.error('Cover Audio Upload Error: No path returned from Supabase.');
+        alert('Error uploading cover audio.');
+        return;
+      }
+    }
+
     let storyId = editingStory?.id;
 
     // Update or insert story
     if (editingStory) {
       const { error: updateError } = await supabase
         .from('stories')
-        .update({ title: form.title, description: form.description, slug, cover_image_url: coverUrl })
+        .update({ title: form.title, description: form.description, slug, cover_image_url: coverUrl, cover_audio_url: coverAudioUrl })
         .eq('id', editingStory.id);
       if (updateError) {
         console.error('Story Update Error:', updateError.message);
@@ -144,7 +167,7 @@ export default function AdminPage() {
     } else {
       const { data: newStory, error: insertError } = await supabase
         .from('stories')
-        .insert([{ title: form.title, description: form.description, slug, cover_image_url: coverUrl }])
+        .insert([{ title: form.title, description: form.description, slug, cover_image_url: coverUrl, cover_audio_url: coverAudioUrl }])
         .select()
         .single();
       if (insertError) {
@@ -235,13 +258,23 @@ export default function AdminPage() {
                   <p className="text-gray-500 text-sm">{story.slug}</p>
                 </div>
                 <div className="mb-2">
-                  <Link
-                    href={`/stories?slug=${story.slug}`}
-                    target="_blank"
-                    className="text-blue-600 dark:text-blue-400 text-sm break-all hover:underline"
-                  >
-                    {`${YOUR_DOMAIN}/stories?slug=${story.slug}`}
-                  </Link>
+                  {story.cover_image_url && (
+                    <img
+                      src={story.cover_image_url}
+                      alt={story.title}
+                      className="w-full h-auto cursor-pointer"
+                      onClick={() => {
+                        if (coverAudioRef.current) {
+                          coverAudioRef.current.pause();
+                          coverAudioRef.current.currentTime = 0;
+                          coverAudioRef.current.play();
+                        }
+                      }}
+                    />
+                  )}
+                  {story.cover_audio_url && (
+                    <audio ref={coverAudioRef} src={story.cover_audio_url} />
+                  )}
                 </div>
                 <div className="flex space-x-2 mt-2">
                   <button onClick={() => handleEditStory(story)} className="px-3 py-1 bg-blue-500 text-white rounded">Edit</button>
@@ -267,7 +300,10 @@ export default function AdminPage() {
               className="w-full p-2 border rounded" />
 
             <label className="block font-semibold">Cover Image</label>
-            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e)} />
+            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'coverFile')} />
+
+            <label className="block font-semibold">Cover Audio (optional)</label>
+            <input type="file" accept="audio/*" onChange={(e) => handleFileChange(e, 'coverAudio')} />
 
             <h3 className="text-lg font-bold mt-6">Slides</h3>
             {form.slides.map((slide, index) => (
