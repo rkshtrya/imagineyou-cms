@@ -1,5 +1,7 @@
+'use client';
+
 import { Suspense } from 'react';
-import StoryInnerPage from './StoryInnerPage';
+import StoryInnerPage from '@/components/StoryInnerPage';
 
 export default function StoriesPage() {
   return (

@@ -1,4 +1,3 @@
-// src/components/StorySlider.tsx
 'use client';
 
 import { useState } from 'react';
@@ -30,6 +29,8 @@ export default function StorySlider({ slides, title }: StorySliderProps) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      <h2 className="text-2xl font-bold text-center">{title}</h2>
+
       {currentSlide.image_url && (
         <img
           src={currentSlide.image_url}
@@ -38,7 +39,17 @@ export default function StorySlider({ slides, title }: StorySliderProps) {
         />
       )}
 
-      <p className="text-lg text-center">{currentSlide.text}</p>
+      {currentSlide.audio_url && (
+        <audio
+          controls
+          src={currentSlide.audio_url}
+          className="w-full mt-4"
+        >
+          Your browser does not support the audio element.
+        </audio>
+      )}
+
+      <p className="text-lg text-center mt-4">{currentSlide.text}</p>
 
       <div className="flex justify-between items-center mt-4">
         <button
@@ -47,7 +58,9 @@ export default function StorySlider({ slides, title }: StorySliderProps) {
         >
           Previous
         </button>
-        <span>{currentIndex + 1} / {slides.length}</span>
+        <span>
+          {currentIndex + 1} / {slides.length}
+        </span>
         <button
           onClick={goNext}
           className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded"

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { v4 as uuidv4 } from 'uuid';
+import { useRouter } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid'; // Import uuidv4
 
 export default function AdminPage() {
   const [stories, setStories] = useState<any[]>([]);
@@ -12,29 +13,66 @@ export default function AdminPage() {
     title: '',
     description: '',
     coverFile: null as File | null,
-    slides: [] as { image: File | null; audio: File | null }[],
+    slides: [] as { image: File | null; audio: File | null; description: string }[],
   });
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [session, setSession] = useState<any | null>(null);
+  const router = useRouter();
 
   const YOUR_DOMAIN = 'https://imagineyou.xyz';
+  const SUPABASE_MEDIA_URL = 'https://rtixmkzobgswzuqewcvk.supabase.co/storage/v1/object/public/media';
 
   useEffect(() => {
+    const fetchSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data.session) {
+        console.error('No active session:', error?.message || 'Session missing');
+        alert('You must be logged in to access this page.');
+        router.push('/login'); // Redirect to login page
+        return;
+      }
+      setSession(data.session);
+    };
+
+    fetchSession();
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        router.push('/login'); // Redirect to login page on sign-out
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setSession(session);
+      }
+    });
+
+    return () => {
+      subscription.subscription.unsubscribe(); // Correctly access the unsubscribe function
+    };
+  }, [router]);
+
+  useEffect(() => {
+    // Fetch stories on component mount
     loadStories();
   }, []);
 
   async function loadStories() {
     const { data, error } = await supabase.from('stories').select('*').order('created_at', { ascending: false });
-    if (!error) setStories(data || []);
+    if (error) {
+      console.error('Error fetching stories:', error.message);
+    } else {
+      console.log('Fetched stories:', data);
+      setStories(data || []);
+    }
   }
 
-  function handleSlideChange(index: number, field: 'image' | 'audio', value: File | null) {
+  function handleSlideChange(index: number, field: 'image' | 'audio' | 'description', value: File | string | null) {
     const updatedSlides = [...form.slides];
-    updatedSlides[index][field] = value;
+    updatedSlides[index] = { ...updatedSlides[index], [field]: value || '' }; // Ensure non-null value
     setForm(prev => ({ ...prev, slides: updatedSlides }));
   }
 
   function handleAddSlide() {
-    setForm(prev => ({ ...prev, slides: [...prev.slides, { image: null, audio: null }] }));
+    setForm(prev => ({ ...prev, slides: [...prev.slides, { image: null, audio: null, description: '' }] }));
   }
 
   function handleFileChange(e: any) {
@@ -51,7 +89,7 @@ export default function AdminPage() {
     if (confirm('Are you sure you want to delete this story and its slides?')) {
       await supabase.from('story_slides').delete().eq('story_id', id);
       await supabase.from('stories').delete().eq('id', id);
-      loadStories();
+      await loadStories(); // Ensure loadStories is awaited
       alert('Story deleted successfully.');
     }
   }
@@ -71,6 +109,7 @@ export default function AdminPage() {
 
     let coverUrl = editingStory?.cover_image_url || '';
 
+    // Upload cover image if provided
     if (form.coverFile) {
       const { data, error } = await supabase.storage.from('media/covers').upload(`${uuidv4()}`, form.coverFile);
       if (error) {
@@ -78,13 +117,23 @@ export default function AdminPage() {
         alert('Error uploading cover image.');
         return;
       }
-      coverUrl = data?.path ? `https://YOUR-SUPABASE-URL/storage/v1/object/public/media/covers/${data.path}` : '';
+
+      // Construct the public URL for the uploaded file
+      if (data?.path) {
+        coverUrl = `${SUPABASE_MEDIA_URL}/covers/${data.path}`;
+      } else {
+        console.error('Cover Upload Error: No path returned from Supabase.');
+        alert('Error uploading cover image.');
+        return;
+      }
     }
 
     let storyId = editingStory?.id;
 
+    // Update or insert story
     if (editingStory) {
-      const { error: updateError } = await supabase.from('stories')
+      const { error: updateError } = await supabase
+        .from('stories')
         .update({ title: form.title, description: form.description, slug, cover_image_url: coverUrl })
         .eq('id', editingStory.id);
       if (updateError) {
@@ -93,7 +142,8 @@ export default function AdminPage() {
         return;
       }
     } else {
-      const { data: newStory, error: insertError } = await supabase.from('stories')
+      const { data: newStory, error: insertError } = await supabase
+        .from('stories')
         .insert([{ title: form.title, description: form.description, slug, cover_image_url: coverUrl }])
         .select()
         .single();
@@ -105,43 +155,62 @@ export default function AdminPage() {
       storyId = newStory.id;
     }
 
+    console.log('Authenticated user ID:', session?.user?.id);
+    console.log('Story ID for slides:', storyId);
+    console.log('Slides to upload:', form.slides);
+
+    // Upload slides
     for (let i = 0; i < form.slides.length; i++) {
       const slide = form.slides[i];
       let imageUrl = null;
       let audioUrl = null;
 
+      // Upload slide image
       if (slide.image) {
         const { data, error } = await supabase.storage.from('media/images').upload(`${uuidv4()}`, slide.image);
         if (error) {
           console.error('Slide Image Upload Error:', error.message);
           continue;
         }
-        imageUrl = `https://YOUR-SUPABASE-URL/storage/v1/object/public/media/images/${data.path}`;
+
+        // Construct the public URL for the uploaded image
+        if (data?.path) {
+          imageUrl = `${SUPABASE_MEDIA_URL}/images/${data.path}`;
+        } else {
+          console.error('Slide Image Upload Error: No path returned from Supabase.');
+          continue;
+        }
       }
 
+      // Upload slide audio
       if (slide.audio) {
         const { data, error } = await supabase.storage.from('media/audio').upload(`${uuidv4()}`, slide.audio);
         if (error) {
           console.error('Slide Audio Upload Error:', error.message);
-        } else {
-          audioUrl = `https://YOUR-SUPABASE-URL/storage/v1/object/public/media/audio/${data.path}`;
+        } else if (data?.path) {
+          audioUrl = `${SUPABASE_MEDIA_URL}/audio/${data.path}`;
         }
       }
 
-      await supabase.from('story_slides').insert({
+      // Insert slide into database
+      const { error: insertSlideError } = await supabase.from('story_slides').insert({
         story_id: storyId,
-        text: slide.image?.name.replace(/\.[^/.]+$/, '') || 'Slide',
+        text: slide.description || 'Slide',
         image_url: imageUrl,
         audio_url: audioUrl,
         order: i + 1,
       });
+
+      if (insertSlideError) {
+        console.error('Slide Insert Error:', insertSlideError.message);
+      }
 
       setUploadProgress(Math.round(((i + 1) / form.slides.length) * 100));
     }
 
     alert('Story saved successfully!');
     resetForm();
-    loadStories();
+    await loadStories(); // Ensure loadStories is awaited
   }
 
   return (
@@ -158,30 +227,31 @@ export default function AdminPage() {
         {/* Existing Stories */}
         <div>
           <h2 className="text-2xl font-semibold mb-4">Existing Stories</h2>
-          {stories.map((story) => (
-            <div key={story.id} className="bg-white dark:bg-gray-800 p-4 rounded shadow mb-4">
-              <div className="mb-2">
-                <p className="font-bold text-lg">{story.title}</p>
-                <p className="text-gray-500 text-sm">{story.slug}</p>
+          {stories.length > 0 ? (
+            stories.map((story) => (
+              <div key={story.id} className="bg-white dark:bg-gray-800 p-4 rounded shadow mb-4">
+                <div className="mb-2">
+                  <p className="font-bold text-lg">{story.title}</p>
+                  <p className="text-gray-500 text-sm">{story.slug}</p>
+                </div>
+                <div className="mb-2">
+                  <Link
+                    href={`/stories?slug=${story.slug}`}
+                    target="_blank"
+                    className="text-blue-600 dark:text-blue-400 text-sm break-all hover:underline"
+                  >
+                    {`${YOUR_DOMAIN}/stories?slug=${story.slug}`}
+                  </Link>
+                </div>
+                <div className="flex space-x-2 mt-2">
+                  <button onClick={() => handleEditStory(story)} className="px-3 py-1 bg-blue-500 text-white rounded">Edit</button>
+                  <button onClick={() => handleDeleteStory(story.id)} className="px-3 py-1 bg-red-500 text-white rounded">Delete</button>
+                </div>
               </div>
-
-              {/* 🔥 Correct Link */}
-              <div className="mb-2">
-                <Link
-                  href={`/stories?slug=${story.slug}`}
-                  target="_blank"
-                  className="text-blue-600 dark:text-blue-400 text-sm break-all hover:underline"
-                >
-                  {`${YOUR_DOMAIN}/stories?slug=${story.slug}`}
-                </Link>
-              </div>
-
-              <div className="flex space-x-2 mt-2">
-                <button onClick={() => handleEditStory(story)} className="px-3 py-1 bg-blue-500 text-white rounded">Edit</button>
-                <button onClick={() => handleDeleteStory(story.id)} className="px-3 py-1 bg-red-500 text-white rounded">Delete</button>
-              </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className="text-gray-500">No stories found.</p>
+          )}
         </div>
 
         {/* Create/Edit Form */}
@@ -206,6 +276,13 @@ export default function AdminPage() {
                 <input type="file" accept="image/*" onChange={(e) => handleSlideChange(index, 'image', e.target.files?.[0] || null)} />
                 <label>Slide Audio (optional):</label>
                 <input type="file" accept="audio/*" onChange={(e) => handleSlideChange(index, 'audio', e.target.files?.[0] || null)} />
+                <label>Slide Description:</label>
+                <textarea
+                  placeholder="Enter slide description"
+                  value={slide.description}
+                  onChange={(e) => handleSlideChange(index, 'description', e.target.value)}
+                  className="w-full p-2 border rounded"
+                />
               </div>
             ))}
 

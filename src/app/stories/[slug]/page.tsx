@@ -1,13 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { useSearchParams } from 'next/navigation';
-import StorySlider from '@/components/StorySlider';
 
-export default function StoryInnerPage() {
-  const searchParams = useSearchParams();
-  const slug = searchParams.get('slug');
+export default function StoryPage() {
+  const params = useParams();
+  const slug = params?.slug as string;
 
   const [story, setStory] = useState<any>(null);
   const [slides, setSlides] = useState<any[]>([]);
@@ -19,6 +18,7 @@ export default function StoryInnerPage() {
     async function fetchStoryData() {
       setLoading(true);
 
+      // Fetch story data
       const { data: storyData, error: storyError } = await supabase
         .from('stories')
         .select('*')
@@ -33,6 +33,7 @@ export default function StoryInnerPage() {
 
       setStory(storyData);
 
+      // Fetch slides data
       const { data: slideData, error: slideError } = await supabase
         .from('story_slides')
         .select('*')
@@ -41,6 +42,7 @@ export default function StoryInnerPage() {
 
       if (slideError) {
         console.error('Error fetching slides:', slideError.message);
+        setSlides([]);
       } else {
         setSlides(slideData || []);
       }
@@ -51,18 +53,10 @@ export default function StoryInnerPage() {
     fetchStoryData();
   }, [slug]);
 
-  if (!slug) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-700 dark:text-gray-300">No story selected.</p>
-      </div>
-    );
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-700 dark:text-gray-300">Loading story...</p>
+        <p className="text-gray-500">Loading story...</p>
       </div>
     );
   }
@@ -70,23 +64,33 @@ export default function StoryInnerPage() {
   if (!story) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-500">Story not found.</p>
+        <p className="text-red-600">Story not found.</p>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-4xl font-bold mb-4 text-center">{story.title}</h1>
-        <p className="text-gray-600 dark:text-gray-400 mb-8 text-center">{story.description}</p>
+    <div className="p-4">
+      <h1 className="text-3xl font-bold mb-4">{story.title}</h1>
+      <p className="text-gray-700 mb-6">{story.description}</p>
 
-        {slides.length > 0 ? (
-          <StorySlider slides={slides} title={story.title} />
-        ) : (
-          <p className="text-gray-500 text-center">No slides available for this story yet.</p>
-        )}
+      <div className="space-y-6">
+        {slides.map((slide, index) => (
+          <div key={index} className="border p-4 rounded shadow">
+            {slide.image_url && (
+              <img
+                src={slide.image_url}
+                alt={`Slide ${index + 1}`}
+                className="w-full h-auto mb-4"
+              />
+            )}
+            {slide.audio_url && (
+              <audio controls src={slide.audio_url} className="w-full mb-4"></audio>
+            )}
+            <p className="text-gray-800">{slide.text}</p>
+          </div>
+        ))}
       </div>
-    </main>
+    </div>
   );
 }
